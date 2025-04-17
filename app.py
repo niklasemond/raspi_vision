@@ -4,11 +4,13 @@ from flask import Flask, render_template, Response
 from ultralytics import YOLO
 import threading
 import time
+import torch
 
 app = Flask(__name__)
 
-# Initialize YOLO model
-model = YOLO('yolov8n.pt')
+# Initialize YOLO model with explicit device
+device = 'cpu'  # Force CPU usage
+model = YOLO('yolov8n.pt').to(device)
 
 # Global variables for video capture and frame processing
 camera = cv2.VideoCapture(0)
@@ -20,7 +22,7 @@ lock = threading.Lock()
 
 def process_frame(frame):
     """Process a single frame with YOLO detection"""
-    results = model(frame, conf=0.5)
+    results = model(frame, conf=0.5, device=device)
     annotated_frame = results[0].plot()
     return annotated_frame
 
