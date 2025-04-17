@@ -5,7 +5,6 @@ from ultralytics import YOLO
 import threading
 import time
 import torch
-import os
 
 app = Flask(__name__)
 
@@ -13,22 +12,14 @@ app = Flask(__name__)
 device = 'cpu'  # Force CPU usage
 model = YOLO('yolov8n.pt').to(device)
 
-# Find working camera
-def find_working_camera():
-    for i in range(32):  # Try up to video31
-        if os.path.exists(f"/dev/video{i}"):
-            cap = cv2.VideoCapture(i)
-            if cap.isOpened():
-                ret, _ = cap.read()
-                cap.release()
-                if ret:
-                    print(f"Using camera at /dev/video{i}")
-                    return i
-    return 0  # Default to 0 if no camera found
+# Initialize camera with specific settings for Raspberry Pi Camera
+camera = cv2.VideoCapture(0, cv2.CAP_V4L2)
+camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+camera.set(cv2.CAP_PROP_FPS, 30)
 
-# Initialize camera with the working device
-camera_id = find_working_camera()
-camera = cv2.VideoCapture(camera_id)
+# Give the camera time to warm up
+time.sleep(2)
 
 # Global variables for video capture and frame processing
 frame_count = 0
