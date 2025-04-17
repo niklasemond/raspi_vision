@@ -5,6 +5,7 @@ from ultralytics import YOLO
 import threading
 import time
 import torch
+import os
 
 app = Flask(__name__)
 
@@ -12,8 +13,24 @@ app = Flask(__name__)
 device = 'cpu'  # Force CPU usage
 model = YOLO('yolov8n.pt').to(device)
 
+# Find working camera
+def find_working_camera():
+    for i in range(32):  # Try up to video31
+        if os.path.exists(f"/dev/video{i}"):
+            cap = cv2.VideoCapture(i)
+            if cap.isOpened():
+                ret, _ = cap.read()
+                cap.release()
+                if ret:
+                    print(f"Using camera at /dev/video{i}")
+                    return i
+    return 0  # Default to 0 if no camera found
+
+# Initialize camera with the working device
+camera_id = find_working_camera()
+camera = cv2.VideoCapture(camera_id)
+
 # Global variables for video capture and frame processing
-camera = cv2.VideoCapture(0)
 frame_count = 0
 detection_interval = 5  # Process every 5th frame to reduce CPU load
 last_frame = None
@@ -33,6 +50,7 @@ def generate_frames():
     while True:
         success, frame = camera.read()
         if not success:
+            print("Error: Could not read frame from camera")
             break
         
         with lock:
