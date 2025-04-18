@@ -4,4 +4,4 @@ ultralytics==8.0.196
 numpy==1.26.4
 torch==2.0.1
 torchvision==0.15.2
-picamera2==0.3.13 
+picamera2==0.3.25 
