@@ -1,37 +1,31 @@
-import cv2
+from picamera2 import Picamera2
 import time
 
-def test_camera(device_id):
-    print(f"\nTrying device /dev/video{device_id}")
-    # Set specific parameters for Raspberry Pi Camera
-    cap = cv2.VideoCapture(device_id, cv2.CAP_V4L2)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    cap.set(cv2.CAP_PROP_FPS, 30)
+def test_camera():
+    print("Initializing camera...")
+    picam2 = Picamera2()
     
-    if not cap.isOpened():
-        print(f"Error: Could not open camera {device_id}")
-        return False
+    # Configure camera
+    config = picam2.create_preview_configuration()
+    picam2.configure(config)
+    
+    # Start camera
+    picam2.start()
     
     # Give the camera time to warm up
     time.sleep(2)
     
-    # Try to read a frame
-    ret, frame = cap.read()
-    if not ret:
-        print(f"Error: Could not read frame from camera {device_id}")
-        cap.release()
+    # Capture a frame
+    try:
+        frame = picam2.capture_array()
+        print("Successfully captured frame")
+        print(f"Frame shape: {frame.shape}")
+        return True
+    except Exception as e:
+        print(f"Error capturing frame: {e}")
         return False
-    
-    print(f"Successfully captured frame from camera {device_id}")
-    print(f"Frame shape: {frame.shape}")
-    
-    # Release the camera
-    cap.release()
-    return True
+    finally:
+        picam2.stop()
 
-# Test the unicam devices (Raspberry Pi Camera)
-for device_id in [0, 1]:
-    if test_camera(device_id):
-        print(f"Found working camera at /dev/video{device_id}")
-        break 
+if __name__ == "__main__":
+    test_camera() 

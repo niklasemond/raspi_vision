@@ -5,6 +5,7 @@ from ultralytics import YOLO
 import threading
 import time
 import torch
+from picamera2 import Picamera2
 
 app = Flask(__name__)
 
@@ -12,11 +13,11 @@ app = Flask(__name__)
 device = 'cpu'  # Force CPU usage
 model = YOLO('yolov8n.pt').to(device)
 
-# Initialize camera with specific settings for Raspberry Pi Camera
-camera = cv2.VideoCapture(0, cv2.CAP_V4L2)
-camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-camera.set(cv2.CAP_PROP_FPS, 30)
+# Initialize camera with picamera2
+picam2 = Picamera2()
+config = picam2.create_preview_configuration()
+picam2.configure(config)
+picam2.start()
 
 # Give the camera time to warm up
 time.sleep(2)
@@ -39,29 +40,34 @@ def generate_frames():
     global frame_count, last_frame, last_detections
     
     while True:
-        success, frame = camera.read()
-        if not success:
-            print("Error: Could not read frame from camera")
+        try:
+            # Capture frame from picamera2
+            frame = picam2.capture_array()
+            
+            # Convert from RGB to BGR for OpenCV
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            
+            with lock:
+                frame_count += 1
+                
+                # Only run detection every few frames
+                if frame_count % detection_interval == 0:
+                    last_frame = frame.copy()
+                    last_detections = process_frame(frame)
+                
+                # Use the last processed frame if available
+                if last_detections is not None:
+                    frame = last_detections
+            
+            # Encode the frame
+            ret, buffer = cv2.imencode('.jpg', frame)
+            frame = buffer.tobytes()
+            
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+        except Exception as e:
+            print(f"Error in frame generation: {e}")
             break
-        
-        with lock:
-            frame_count += 1
-            
-            # Only run detection every few frames
-            if frame_count % detection_interval == 0:
-                last_frame = frame.copy()
-                last_detections = process_frame(frame)
-            
-            # Use the last processed frame if available
-            if last_detections is not None:
-                frame = last_detections
-        
-        # Encode the frame
-        ret, buffer = cv2.imencode('.jpg', frame)
-        frame = buffer.tobytes()
-        
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
 @app.route('/')
 def index():
@@ -75,4 +81,7 @@ def video_feed():
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False) 
+    try:
+        app.run(host='0.0.0.0', port=5000, debug=False)
+    finally:
+        picam2.stop() 
