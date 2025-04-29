@@ -11,7 +11,7 @@ import threading
 
 app = Flask(__name__)
 
-# Initialize YOLO model with explicit device
+# Initialize YOLO model with optimized settings
 device = 'cpu'  # Force CPU usage
 model = YOLO('yolov8n.pt').to(device)
 
@@ -27,10 +27,11 @@ picam2.start()
 time.sleep(2)
 
 # Global variables for video capture and frame processing
-frame_queue = Queue(maxsize=2)  # Small queue to prevent lag
-detection_interval = 15  # Process every 15th frame
+frame_queue = Queue(maxsize=1)  # Single frame queue to prevent lag
+detection_interval = 30  # Process every 30th frame
 last_detections = None
 lock = threading.Lock()
+processing_resolution = (320, 240)  # Reduced resolution for processing
 
 def detection_thread():
     """Separate thread for object detection"""
@@ -43,10 +44,27 @@ def detection_thread():
             frame_count += 1
             
             if frame_count % detection_interval == 0:
-                # Process frame for detection
-                results = model(frame, conf=0.5, device=device)
+                # Resize frame to smaller size for faster processing
+                small_frame = cv2.resize(frame, processing_resolution)
+                
+                # Process frame with optimized settings
+                results = model(small_frame, 
+                              conf=0.5, 
+                              device=device,
+                              imgsz=processing_resolution,
+                              half=True)  # Use half precision
+                
+                # Resize detections back to original size
                 with lock:
-                    last_detections = results[0].plot()
+                    if results[0].boxes is not None:
+                        # Create blank image at original size
+                        blank = np.zeros((480, 640, 3), dtype=np.uint8)
+                        # Resize the annotated frame
+                        resized = cv2.resize(results[0].plot(), (640, 480))
+                        # Overlay detections on original frame
+                        last_detections = cv2.addWeighted(frame, 0.7, resized, 0.3, 0)
+                    else:
+                        last_detections = frame
             
             frame_queue.task_done()
         except Exception as e:
@@ -61,16 +79,18 @@ def generate_frames():
     detector = threading.Thread(target=detection_thread, daemon=True)
     detector.start()
     
+    frame_count = 0
     while True:
         try:
-            # Capture frame from picamera2
-            frame = picam2.capture_array()
-            
-            # Convert from RGB to BGR for OpenCV
-            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-            
-            # Add frame to queue if not full
-            if not frame_queue.full():
+            # Skip frames if queue is not empty to prevent lag
+            if frame_queue.empty():
+                # Capture frame from picamera2
+                frame = picam2.capture_array()
+                
+                # Convert from RGB to BGR for OpenCV
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                
+                # Add frame to queue
                 frame_queue.put(frame.copy())
             
             # Use the last processed frame if available, otherwise use current frame
@@ -82,11 +102,15 @@ def generate_frames():
             
             # Encode the frame with optimized settings
             ret, buffer = cv2.imencode('.jpg', display_frame, 
-                                     [cv2.IMWRITE_JPEG_QUALITY, 85])
+                                     [cv2.IMWRITE_JPEG_QUALITY, 90])
             frame_bytes = buffer.tobytes()
             
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+            
+            # Small delay to prevent overwhelming the client
+            time.sleep(0.01)
+            
         except Exception as e:
             print(f"Error in frame generation: {e}")
             break
