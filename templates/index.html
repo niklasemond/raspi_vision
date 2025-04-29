@@ -4,10 +4,10 @@
     <title>Raspberry Pi Object Detection</title>
     <style>
         body {
+            font-family: Arial, sans-serif;
             margin: 0;
             padding: 20px;
             background-color: #f0f0f0;
-            font-family: Arial, sans-serif;
         }
         .container {
             max-width: 800px;
@@ -16,33 +16,19 @@
         }
         h1 {
             color: #333;
-            margin-bottom: 20px;
         }
-        .video-container {
-            position: relative;
-            width: 100%;
-            padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
-            margin: 0 auto;
+        #videoFeed {
+            width: 640px;
+            height: 480px;
             background-color: #000;
-            border-radius: 8px;
-            overflow: hidden;
+            margin: 20px auto;
+            display: block;
         }
-        .video-feed {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-        .controls {
-            margin: 20px 0;
-        }
-        .toggle-btn {
+        .button {
             background-color: #4CAF50;
-            color: white;
             border: none;
-            padding: 12px 24px;
+            color: white;
+            padding: 15px 32px;
             text-align: center;
             text-decoration: none;
             display: inline-block;
@@ -52,16 +38,17 @@
             border-radius: 4px;
             transition: background-color 0.3s;
         }
-        .toggle-btn:hover {
+        .button:hover {
             background-color: #45a049;
         }
-        .toggle-btn.off {
-            background-color: #f44336;
+        .button.disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
         }
-        .toggle-btn.off:hover {
-            background-color: #da190b;
+        .button.disabled:hover {
+            background-color: #cccccc;
         }
-        .status {
+        #status {
             margin-top: 10px;
             font-size: 14px;
             color: #666;
@@ -71,33 +58,32 @@
 <body>
     <div class="container">
         <h1>Raspberry Pi Object Detection</h1>
-        <div class="video-container">
-            <img id="videoFeed" src="{{ url_for('video_feed') }}" class="video-feed">
-        </div>
-        <div class="controls">
-            <button id="detectionToggle" class="toggle-btn">Enable Detection</button>
-            <div class="status" id="statusText">Detection: Off</div>
-        </div>
+        <img id="videoFeed" src="{{ url_for('video_feed') }}">
+        <button id="detectionToggle" class="button">Enable Detection</button>
+        <div id="status">Detection: Off</div>
     </div>
 
     <script>
-        const toggleBtn = document.getElementById('detectionToggle');
-        const statusText = document.getElementById('statusText');
+        const toggleButton = document.getElementById('detectionToggle');
+        const statusText = document.getElementById('status');
         const videoFeed = document.getElementById('videoFeed');
         let detectionEnabled = false;
 
-        toggleBtn.addEventListener('click', function() {
-            detectionEnabled = !detectionEnabled;
-            if (detectionEnabled) {
-                this.textContent = 'Disable Detection';
-                this.classList.add('off');
-                statusText.textContent = 'Detection: On';
-                videoFeed.src = "{{ url_for('video_feed') }}?detection=true";
-            } else {
-                this.textContent = 'Enable Detection';
-                this.classList.remove('off');
-                statusText.textContent = 'Detection: Off';
-                videoFeed.src = "{{ url_for('video_feed') }}?detection=false";
+        toggleButton.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/toggle_detection');
+                const data = await response.json();
+                detectionEnabled = data.detection_enabled;
+                
+                // Update button and status
+                toggleButton.textContent = detectionEnabled ? 'Disable Detection' : 'Enable Detection';
+                toggleButton.className = `button ${detectionEnabled ? 'disabled' : ''}`;
+                statusText.textContent = `Detection: ${detectionEnabled ? 'On' : 'Off'}`;
+                
+                // Force video feed to reload
+                videoFeed.src = videoFeed.src.split('?')[0] + '?t=' + new Date().getTime();
+            } catch (error) {
+                console.error('Error toggling detection:', error);
             }
         });
     </script>

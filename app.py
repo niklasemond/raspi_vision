@@ -26,6 +26,7 @@ detection_interval = 45  # Process every 45th frame
 last_detections = None
 lock = threading.Lock()
 processing_resolution = (160, 128)  # Further reduced resolution for faster processing
+detection_enabled = False  # Global detection state
 
 def init_camera():
     """Initialize camera with retry mechanism"""
@@ -131,10 +132,7 @@ def detection_thread():
 
 def generate_frames():
     """Generate video frames with object detection"""
-    global last_detections
-    
-    # Get detection parameter from request
-    detection_enabled = request.args.get('detection', 'false').lower() == 'true'
+    global last_detections, detection_enabled
     
     # Start detection thread only if detection is enabled
     if detection_enabled:
@@ -185,6 +183,13 @@ def generate_frames():
 def index():
     """Render the main page"""
     return render_template('index.html')
+
+@app.route('/toggle_detection')
+def toggle_detection():
+    """Toggle detection state"""
+    global detection_enabled
+    detection_enabled = not detection_enabled
+    return {'status': 'success', 'detection_enabled': detection_enabled}
 
 @app.route('/video_feed')
 def video_feed():
