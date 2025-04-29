@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from flask import Flask, render_template, Response
+from flask import Flask, render_template, Response, request
 from ultralytics import YOLO
 import threading
 import time
