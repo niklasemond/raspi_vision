@@ -39,23 +39,17 @@ def init_camera():
     for attempt in range(max_retries):
         try:
             picam2 = Picamera2()
-            # Configure camera with wider field of view and proper color balance
+            # Configure camera with maximum field of view
             config = picam2.create_preview_configuration(
-                main={"size": (640, 480), "format": "RGB888"},
+                main={"size": (1640, 1232), "format": "RGB888"},  # Use sensor's native resolution
                 transform=libcamera.Transform(hflip=0, vflip=0),  # No flip
-                buffer_count=2,  # Reduced buffer count for lower latency
-                lores={"size": (320, 240), "format": "YUV420"}  # Add low-res stream
+                buffer_count=2  # Reduced buffer count for lower latency
             )
-            # Set controls for proper color balance and exposure
+            # Set controls for maximum field of view
             controls = {
-                "ScalerCrop": (0, 0, 640, 480),  # Full sensor area
+                "ScalerCrop": (0, 0, 1640, 1232),  # Full sensor area
                 "AeEnable": True,
                 "AwbEnable": True,
-                "AwbMode": libcamera.controls.AwbModeEnum.Auto,  # Auto white balance
-                "ColourGains": (1.0, 1.0),  # Reset color gains
-                "Brightness": 0.0,  # Reset brightness
-                "Contrast": 1.0,  # Reset contrast
-                "Saturation": 1.0,  # Reset saturation
                 "FrameDurationLimits": (33333, 33333)  # 30 fps
             }
             picam2.configure(config)
@@ -153,6 +147,9 @@ def generate_frames():
                 
                 # Convert from RGB to BGR for OpenCV
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                
+                # Resize frame to display size while maintaining aspect ratio
+                frame = cv2.resize(frame, (640, 480))
                 
                 # Add frame to queue
                 frame_queue.put(frame.copy())
