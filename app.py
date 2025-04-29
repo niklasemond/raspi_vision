@@ -11,6 +11,7 @@ import threading
 import os
 import signal
 import sys
+import libcamera
 
 app = Flask(__name__)
 
@@ -38,10 +39,20 @@ def init_camera():
     for attempt in range(max_retries):
         try:
             picam2 = Picamera2()
+            # Configure camera with wider field of view
             config = picam2.create_preview_configuration(
-                main={"size": (640, 480), "format": "RGB888"}
+                main={"size": (640, 480), "format": "RGB888"},
+                transform=libcamera.Transform(hflip=0, vflip=0)  # No flip
             )
+            # Set camera controls for wider field of view
+            controls = {
+                "AfMode": libcamera.controls.AfModeEnum.Continuous,
+                "AfSpeed": libcamera.controls.AfSpeedEnum.Fast,
+                "LensPosition": 0.0,  # Set to infinity focus
+                "ScalerCrop": (0, 0, 640, 480)  # Full sensor area
+            }
             picam2.configure(config)
+            picam2.set_controls(controls)
             picam2.start()
             print(f"Camera initialized successfully on attempt {attempt + 1}")
             return True
