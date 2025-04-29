@@ -8,6 +8,9 @@ import torch
 from picamera2 import Picamera2
 from queue import Queue
 import threading
+import os
+import signal
+import sys
 
 app = Flask(__name__)
 
@@ -15,23 +18,67 @@ app = Flask(__name__)
 device = 'cpu'  # Force CPU usage
 model = YOLO('yolov8n.pt').to(device)
 
-# Initialize camera with optimized settings
-picam2 = Picamera2()
-config = picam2.create_preview_configuration(
-    main={"size": (640, 480), "format": "RGB888"}
-)
-picam2.configure(config)
-picam2.start()
-
-# Give the camera time to warm up
-time.sleep(2)
-
-# Global variables for video capture and frame processing
+# Global variables
+picam2 = None
 frame_queue = Queue(maxsize=1)  # Single frame queue to prevent lag
 detection_interval = 45  # Process every 45th frame
 last_detections = None
 lock = threading.Lock()
 processing_resolution = (160, 128)  # Further reduced resolution for faster processing
+
+def init_camera():
+    """Initialize camera with retry mechanism"""
+    global picam2
+    
+    # Try to kill any existing processes using the camera
+    os.system('sudo pkill -f libcamera')
+    time.sleep(1)  # Wait for processes to terminate
+    
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            picam2 = Picamera2()
+            config = picam2.create_preview_configuration(
+                main={"size": (640, 480), "format": "RGB888"}
+            )
+            picam2.configure(config)
+            picam2.start()
+            print(f"Camera initialized successfully on attempt {attempt + 1}")
+            return True
+        except Exception as e:
+            print(f"Camera initialization attempt {attempt + 1} failed: {e}")
+            if picam2 is not None:
+                try:
+                    picam2.close()
+                except:
+                    pass
+            time.sleep(1)  # Wait before retrying
+    
+    print("Failed to initialize camera after multiple attempts")
+    return False
+
+def cleanup(signum, frame):
+    """Cleanup function to be called on exit"""
+    global picam2
+    if picam2 is not None:
+        try:
+            picam2.stop()
+            picam2.close()
+        except:
+            pass
+    sys.exit(0)
+
+# Register cleanup handler
+signal.signal(signal.SIGINT, cleanup)
+signal.signal(signal.SIGTERM, cleanup)
+
+# Initialize camera
+if not init_camera():
+    print("Exiting due to camera initialization failure")
+    sys.exit(1)
+
+# Give the camera time to warm up
+time.sleep(2)
 
 def detection_thread():
     """Separate thread for object detection"""
@@ -129,4 +176,4 @@ if __name__ == '__main__':
     try:
         app.run(host='0.0.0.0', port=5000, debug=False)
     finally:
-        picam2.stop() 
+        cleanup(None, None) 
