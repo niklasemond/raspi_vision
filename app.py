@@ -39,17 +39,18 @@ def init_camera():
     for attempt in range(max_retries):
         try:
             picam2 = Picamera2()
-            # Configure camera with wider field of view
+            # Configure camera with wider field of view using sensor mode
             config = picam2.create_preview_configuration(
                 main={"size": (640, 480), "format": "RGB888"},
-                transform=libcamera.Transform(hflip=0, vflip=0)  # No flip
+                transform=libcamera.Transform(hflip=0, vflip=0),  # No flip
+                buffer_count=2  # Reduced buffer count for lower latency
             )
-            # Set camera controls for wider field of view
+            # Set only supported controls
             controls = {
-                "AfMode": libcamera.controls.AfModeEnum.Continuous,
-                "AfSpeed": libcamera.controls.AfSpeedEnum.Fast,
-                "LensPosition": 0.0,  # Set to infinity focus
-                "ScalerCrop": (0, 0, 640, 480)  # Full sensor area
+                "ScalerCrop": (0, 0, 640, 480),  # Full sensor area
+                "AeEnable": True,
+                "AwbEnable": True,
+                "FrameDurationLimits": (33333, 33333)  # 30 fps
             }
             picam2.configure(config)
             picam2.set_controls(controls)
