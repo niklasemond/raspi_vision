@@ -31,7 +31,7 @@ frame_queue = Queue(maxsize=1)  # Single frame queue to prevent lag
 detection_interval = 30  # Process every 30th frame
 last_detections = None
 lock = threading.Lock()
-processing_resolution = (320, 240)  # Reduced resolution for processing
+processing_resolution = (320, 256)  # Adjusted to be multiple of 32
 
 def detection_thread():
     """Separate thread for object detection"""
@@ -51,8 +51,7 @@ def detection_thread():
                 results = model(small_frame, 
                               conf=0.5, 
                               device=device,
-                              imgsz=processing_resolution,
-                              half=True)  # Use half precision
+                              imgsz=processing_resolution)  # Removed half=True
                 
                 # Resize detections back to original size
                 with lock:
