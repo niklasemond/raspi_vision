@@ -28,10 +28,10 @@ time.sleep(2)
 
 # Global variables for video capture and frame processing
 frame_queue = Queue(maxsize=1)  # Single frame queue to prevent lag
-detection_interval = 30  # Process every 30th frame
+detection_interval = 45  # Process every 45th frame
 last_detections = None
 lock = threading.Lock()
-processing_resolution = (320, 256)  # Adjusted to be multiple of 32
+processing_resolution = (160, 128)  # Further reduced resolution for faster processing
 
 def detection_thread():
     """Separate thread for object detection"""
@@ -49,9 +49,9 @@ def detection_thread():
                 
                 # Process frame with optimized settings
                 results = model(small_frame, 
-                              conf=0.5, 
+                              conf=0.4,  # Slightly lower confidence threshold
                               device=device,
-                              imgsz=processing_resolution)  # Removed half=True
+                              imgsz=processing_resolution)
                 
                 # Resize detections back to original size
                 with lock:
@@ -60,8 +60,8 @@ def detection_thread():
                         blank = np.zeros((480, 640, 3), dtype=np.uint8)
                         # Resize the annotated frame
                         resized = cv2.resize(results[0].plot(), (640, 480))
-                        # Overlay detections on original frame
-                        last_detections = cv2.addWeighted(frame, 0.7, resized, 0.3, 0)
+                        # Overlay detections on original frame with higher opacity
+                        last_detections = cv2.addWeighted(frame, 0.8, resized, 0.2, 0)
                     else:
                         last_detections = frame
             
@@ -101,14 +101,14 @@ def generate_frames():
             
             # Encode the frame with optimized settings
             ret, buffer = cv2.imencode('.jpg', display_frame, 
-                                     [cv2.IMWRITE_JPEG_QUALITY, 90])
+                                     [cv2.IMWRITE_JPEG_QUALITY, 95])
             frame_bytes = buffer.tobytes()
             
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
             
-            # Small delay to prevent overwhelming the client
-            time.sleep(0.01)
+            # Smaller delay to improve responsiveness
+            time.sleep(0.005)
             
         except Exception as e:
             print(f"Error in frame generation: {e}")
