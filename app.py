@@ -133,9 +133,13 @@ def generate_frames():
     """Generate video frames with object detection"""
     global last_detections
     
-    # Start detection thread
-    detector = threading.Thread(target=detection_thread, daemon=True)
-    detector.start()
+    # Get detection parameter from request
+    detection_enabled = request.args.get('detection', 'false').lower() == 'true'
+    
+    # Start detection thread only if detection is enabled
+    if detection_enabled:
+        detector = threading.Thread(target=detection_thread, daemon=True)
+        detector.start()
     
     frame_count = 0
     while True:
@@ -151,12 +155,13 @@ def generate_frames():
                 # Resize frame to display size while maintaining aspect ratio
                 frame = cv2.resize(frame, (640, 480))
                 
-                # Add frame to queue
-                frame_queue.put(frame.copy())
+                # Add frame to queue only if detection is enabled
+                if detection_enabled and not frame_queue.full():
+                    frame_queue.put(frame.copy())
             
-            # Use the last processed frame if available, otherwise use current frame
+            # Use the last processed frame if detection is enabled and available
             with lock:
-                if last_detections is not None:
+                if detection_enabled and last_detections is not None:
                     display_frame = last_detections
                 else:
                     display_frame = frame

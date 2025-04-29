@@ -35,14 +35,71 @@
             height: 100%;
             object-fit: contain;
         }
+        .controls {
+            margin: 20px 0;
+        }
+        .toggle-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        .toggle-btn:hover {
+            background-color: #45a049;
+        }
+        .toggle-btn.off {
+            background-color: #f44336;
+        }
+        .toggle-btn.off:hover {
+            background-color: #da190b;
+        }
+        .status {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Raspberry Pi Object Detection</h1>
         <div class="video-container">
-            <img src="{{ url_for('video_feed') }}" class="video-feed">
+            <img id="videoFeed" src="{{ url_for('video_feed') }}" class="video-feed">
+        </div>
+        <div class="controls">
+            <button id="detectionToggle" class="toggle-btn">Enable Detection</button>
+            <div class="status" id="statusText">Detection: Off</div>
         </div>
     </div>
+
+    <script>
+        const toggleBtn = document.getElementById('detectionToggle');
+        const statusText = document.getElementById('statusText');
+        const videoFeed = document.getElementById('videoFeed');
+        let detectionEnabled = false;
+
+        toggleBtn.addEventListener('click', function() {
+            detectionEnabled = !detectionEnabled;
+            if (detectionEnabled) {
+                this.textContent = 'Disable Detection';
+                this.classList.add('off');
+                statusText.textContent = 'Detection: On';
+                videoFeed.src = "{{ url_for('video_feed') }}?detection=true";
+            } else {
+                this.textContent = 'Enable Detection';
+                this.classList.remove('off');
+                statusText.textContent = 'Detection: Off';
+                videoFeed.src = "{{ url_for('video_feed') }}?detection=false";
+            }
+        });
+    </script>
 </body>
 </html> 
